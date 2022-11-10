@@ -1,0 +1,70 @@
+#cloud-config
+
+# Above line is not a comment, it is required for cloud-config to run, it is similar to a shebang line in bash!
+
+# Run all the config commands
+runcmd:
+# Make testfile to see cloud-init started
+  - sudo touch /home/ubuntu/test.txt
+# Update apt packages
+  - sudo apt-get update
+# Install all dependencies
+  - sudo apt install -y apache2
+  - sudo apt install -y ghostscript
+  - sudo apt install -y libapache2-mod-php
+  - sudo apt install -y mysql-server
+  - sudo apt install -y php
+  - sudo apt install -y php-bcmath
+  - sudo apt install -y php-curl
+  - sudo apt install -y php-imagick
+  - sudo apt install -y php-intl
+  - sudo apt install -y php-json
+  - sudo apt install -y php-mbstring
+  - sudo apt install -y php-mysql
+  - sudo apt install -y php-xml
+  - sudo apt install -y php-zip
+# Create a wordpress.conf file from the template
+  - sudo cp /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/wordpress.conf
+# Get and extract worldpress
+  - cd /tmp
+  - sudo wget https://wordpress.org/latest.tar.gz
+  - cd /var/www
+  - sudo tar xpf /tmp/latest.tar.gz
+  - sudo chown -R www-data:www-data /var/www/wordpress
+ # Install wordpress
+  - sudo wget https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+  - sudo chmod +x wp-cli.phar
+  - sudo mv wp-cli.phar /usr/local/bin/wp
+  - sudo cp /tmp/wordpress.conf /etc/apache2/sites-available/wordpress.conf
+  - sudo chown -R ubuntu:ubuntu /etc/apache2/sites-available/wordpress.conf  
+# Enable Apache modules, site, disable default site and reload Apache
+  - sudo a2enmod rewrite
+  - sudo a2ensite wordpress.conf
+  - sudo a2dissite 000-default
+  - sudo systemctl reload apache2
+# AWS CLI install
+  - sudo apt install -y awscli
+# AWS CLI config - these keys reeeeealy shouldn't be here in plaintext
+  - aws configure set aws_access_key_id "YOUR_KEY_ID_GOES_HERE"
+  - aws configure set aws_secret_access_key "YOUR_SECRET_KEY_GOES_HERE"
+  - aws configure set region "eu-central-1" 
+  - aws configure set output "json"
+#Get private Ip of MySQL server instance
+  - sqladdress=$(aws ec2 describe-instances --filters Name=tag:Name,Values=Isti_MySQL Name=instance-state-name,Values=running --query "Reservations[*].Instances[*].NetworkInterfaces[*].PrivateIpAddress" --output text)
+# Create wp-config.php and install wp-core
+  - sudo service mysql restart
+  - cd /var/www/wordpress
+  - sudo wp config create --dbname=wordpress --dbuser=cloudbros --dbpass=password --dbhost=$sqladdress --force --allow-root
+  - sudo chown -R www-data:www-data /var/www/wordpress
+  - myip=$(curl http://checkip.amazonaws.com)
+  - sudo wp core install --url=$myip --title='Terraform Adventures' --admin_user=BroBro --admin_password=password --admin_email=not@giving.it --skip-email --allow-root
+# Change default theme and make some short blogposts, also remove the Hello World post
+  - sudo wp theme activate twentytwentytwo --allow-root
+  - sudo wp post delete 1 --allow-root
+  - sudo wp post create --post_type=post --post_title='Resources to tackle Terraform' --post_content='<p><a href="https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli">Install Terraform</a></p><p><a href="https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance">AWS EC2 with Terraform</a></p><p><a href="https://linuxhint.com/create-security-groups-aws-terraform/">AWS SecGroups with Terraform</a></p><p><a href="https://docs.aws.amazon.com/pdfs/AWSEC2/latest/UserGuide/ec2-ug.pdf">AWS EC2 guide</a></p><p><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/hosting-wordpress-aml-2022.html">AWS Wordpress guide for Ubuntu 20</a></p><p><a href="https://www.digitalocean.com/community/tutorials/install-wordpress-on-ubuntu">Wordpress guide for Ubuntu 18</a></p><p><a href="https://www.linode.com/docs/guides/installing-and-configuring-mysql-on-ubuntu-2004/">AWS MySQL guide</a></p><p><a href="https://bertvv.github.io/notes-to-self/2015/11/16/automating-mysql_secure_installation/">Automating mysql_secure_installation</a></p><p><a href="https://www.cyberciti.biz/faq/how-to-find-public-ip-address-aws-ec2-or-lightsail-vm/">EC2 public address guide</a></p><p><a href="https://serverfault.com/questions/971990/how-to-find-out-an-ec2-instances-private-and-public-ip-via-aws-cli">AWS CLI instance filtering</a></p><p><a href="https://www.linode.com/docs/guides/installing-and-configuring-mysql-on-ubuntu-2004/">AWS MySQL guide</a></p><p><a href="https://www.linode.com/docs/guides/installing-and-configuring-mysql-on-ubuntu-2004/">AWS MySQL guide</a></p><p><a href="https://developer.wordpress.org/cli/commands/post/create/">Wordpress CLI post create</a></p><p> </p><p>Pár videó azoknak, akik belemélyednének kicsit jobban:</p><p> </p><p><a href="https://www.youtube.com/watch?v=tomUWcQ0P3kp">Terraform 100 másodpercben</a></p><p><a href="https://www.youtube.com/watch?v=l5k1ai_GBDE">Terraform 15 percben</a></p> <p><a href="https://www.youtube.com/watch?v=SLB_c_ayRMo">Terraform két órában</a></p>' --post_status=publish --allow-root
+  - sudo wp post create --post_type=post --post_title='Terraform is easy. For a certain definition of easy.' --post_content=' ' --post_status=publish --allow-root
+# Give the www-data user permissions and ownership of wordpress folders
+  - sudo chown -R www-data:www-data /var/www/wordpress
+  - sudo chmod -R g+w /var/www/wordpress
+# Create file to denote script run is finished
+  - sudo touch /home/ubuntu/wp_ready.csv

@@ -1,0 +1,40 @@
+#cloud-config
+
+# Above line is not a comment, it is required for cloud-config to run, it is similar to a shebang line in bash!
+
+# Download required packages
+packages:
+  - mysql-server
+
+# Run all the config commands
+runcmd:
+# Generate testfile
+  - sudo touch /home/ubuntu/data.dat
+# Change mysql config file
+  - sudo sed -i 's/bind-address.*/bind-address=0\.0\.0\.0/g' /etc/mysql/mysql.conf.d/mysqld.cnf
+  - sudo service mysql restart
+ # Make sure that NOBODY can access the server without a password
+  - sudo mysql -e "UPDATE mysql.user SET Password = PASSWORD('password') WHERE User = 'root'"
+# Kill the anonymous users
+  - sudo mysql -e "DROP USER ''@'localhost'"
+# Because our hostname varies we'll use some Bash magic here.
+  - sudo mysql -e "DROP USER ''@'$(hostname)'"
+# Kill off the demo database
+  - sudo mysql -e "DROP DATABASE IF EXISTS test;"
+# Extra kill off the demo database
+  - sudo mysql -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
+# Create wordpress user
+  - sudo mysql -e "CREATE USER 'cloudbros'@'%' IDENTIFIED BY 'password';"
+# Create wordpress db
+  - sudo mysql -e "CREATE DATABASE wordpress;"
+# Grant privileges to the user and grant the user permissions to access the database
+  - sudo mysql -e "GRANT ALL PRIVILEGES ON wordpress.* TO 'cloudbros'@'%';"
+# Allow MySQL traffic through the ufw firewall
+  - sudo ufw allow mysql
+# Make our changes take effect
+  - sudo mysql -e "FLUSH PRIVILEGES"
+  - sudo service mysql restart
+# Create marker after all sql commands were executed
+  - sudo touch /home/ubuntu/sql_ready.csv
+
+
