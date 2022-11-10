@@ -42,4 +42,7 @@
  IMPORTANT: HTTPS is not available in this version, so make sure to open your blog using a http:// address.
 
  Enjoy!
+ 
+ Authors: https://github.com/WRicsi
+          https://github.com/csotiistvan
 
